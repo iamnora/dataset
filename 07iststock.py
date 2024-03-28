@@ -14,11 +14,8 @@ print(df.describe())
 # Veri setindeki eksik değerleri kontrol et
 print(df.isnull().sum())
 
-
-
 # Tarih-zaman sütununu uygun bir şekilde dönüştür
 df['Date'] = pd.to_datetime(df['Date'])
-
 
 # Standartlaştırma
 numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
@@ -34,13 +31,8 @@ correlation_matrix = numeric_df.corr()
 df.hist(figsize=(12, 10))
 plt.show()
 
-
-
-
-
 # Korelasyon matrisini hesapla
 #correlation_matrix = df.drop(['Symbol'], axis=1).corr()
-
 
 sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm')
 plt.title('Correlation Matrix')
