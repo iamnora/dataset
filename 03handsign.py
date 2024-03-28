@@ -30,7 +30,6 @@ for feature in features:
 
 feature_df = pd.DataFrame(feature_data)
 
-
 feature_df = pd.DataFrame(feature_data)
 
 feature_df.to_csv('Feature_Extraction_Results.csv', index=False)
