@@ -69,9 +69,14 @@ data['Demir:Dolar Oranı'] = data['Demir'] / data['Dolar'] """
 X = data.drop(columns=['Fiyat'])
 y = data['Fiyat']
 
-# Standart ölçeklendirme
+# Veriyi ölçeklendir
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
+y_scaled = scaler.fit_transform(y.values.reshape(-1, 1))
+
+# Veri setini tablo haline getirme
+df_tabular = pd.DataFrame(X_scaled, columns=X.columns)
+df_tabular['Fiyat'] = y_scaled.flatten()
 
 # Veri setinin ilk birkaç satırını kontrol edelim
 print(data.head())
@@ -83,27 +88,38 @@ print(data.describe())
 data.hist(figsize=(15, 10))
 plt.tight_layout()
 plt.show()
+num_cols = len(df_tabular.columns)
 
 # Box plotlar
-plt.figure(figsize=(15, 10))
-sns.boxplot(data=data)
-plt.xticks(rotation=90)
+plt.figure(figsize=(12, 6))
+for i, col in enumerate(df_tabular.columns):
+    plt.subplot(2, (num_cols+1)//2, i + 1)
+    sns.boxplot(y=df_tabular[col], color='green')
+    plt.title(col)
 plt.tight_layout()
 plt.show()
 
-# Violin plotlar
+# Violin plot
+plt.figure(figsize=(12, 6))
+for i, col in enumerate(df_tabular.columns):
+    plt.subplot(2, (num_cols+1)//2, i + 1)
+    sns.violinplot(y=df_tabular[col], color='orange')
+    plt.title(col)
+plt.tight_layout()
+plt.show()
+
+# Scatter plot
 plt.figure(figsize=(15, 10))
-sns.violinplot(data=data)
-plt.xticks(rotation=90)
+for i, col in enumerate(df_tabular.columns[:-1]):
+    plt.subplot(2, (num_cols+1)//2, i + 1)
+    sns.scatterplot(x=df_tabular[col], y=df_tabular['Fiyat'], color='purple')
+    plt.title(col + ' vs Fiyat')
 plt.tight_layout()
 plt.show()
 
 # Korelasyon matrisi
-corr_matrix = data.corr()
-
-# Korelasyon matrisini görselleştirelim
-plt.figure(figsize=(15, 10))
+corr_matrix = df_tabular.corr().abs()
+plt.figure(figsize=(8, 6))
 sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f")
-plt.title('Korelasyon Matrisi')
-plt.tight_layout()
+plt.title("Korelasyon Matrisi")
 plt.show()
