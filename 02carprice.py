@@ -3,74 +3,86 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import SelectKBest, f_regression
-from sklearn.decomposition import PCA
+from stringClassifier import classify_strings
 
-# Veri setini yükleme
-data = pd.read_csv('sh_car_price.csv')
+data = pd.read_csv('sh_car_price.csv', on_bad_lines='skip')
 
-# Giriş ve çıkış sütunlarını ayırma
-X = data.drop(columns=['output_column'])
-y = data['output_column']
 
-# Sayısal olmayan sütunları filtreleme
-non_numeric_columns = X.select_dtypes(exclude=[np.number]).columns
 
-# Sayısal olmayan sütunları veri çerçevesinden çıkarma
-X_numeric = X.drop(columns=non_numeric_columns)
+for item in data:
+    try: 
+     data[item] = data[item].astype(float)
+    
+    except ValueError:
+     data[item] = classify_strings(data[item])
 
-# Standart ölçeklendirme
+data['Year'] = data["Year"].values.astype("float64")
+data['Date of Currency'] = data["Date of Currency"].values.astype("float64")
+
+
+
+  
+ 
+
+
+
+
+# Giriş ve çıkış sütunlarını ayıralım
+X = data.drop(columns=['Price'])
+y = data['Price'] 
+#There were no prediction outputs so we used this field as an example
+
+# Veriyi ölçeklendir
 scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X_numeric)
+X_scaled = scaler.fit_transform(X)
+y_scaled = scaler.fit_transform(y.values.reshape(-1, 1))
 
-# Yeni özelliklerin çıkarılması (örneğin, temel bileşen analizi - PCA)
-pca = PCA(n_components=2)
-X_pca = pca.fit_transform(X_scaled)
+# Veri setini tablo haline getirme
+df_tabular = pd.DataFrame(X_scaled, columns=X.columns)
+df_tabular['Price'] = y_scaled.flatten()
 
-# Veri setinin görselleştirilmesi
+# Veri setinin ilk birkaç satırını kontrol edelim
+print(data.head())
+
+# Veri setindeki sütunların istatistiksel bilgilerini alalım
+print(data.describe())
 
 # Histogramlar
-X_numeric.hist(figsize=(15, 10))
+data.hist(figsize=(15, 10))
 plt.tight_layout()
 plt.show()
+num_cols = len(df_tabular.columns)
 
 # Box plotlar
-plt.figure(figsize=(15, 10))
-sns.boxplot(data=X_numeric)
-plt.xticks(rotation=45)
+plt.figure(figsize=(12, 6))
+for i, col in enumerate(df_tabular.columns):
+    plt.subplot(2, (num_cols+1)//2, i + 1)
+    sns.boxplot(y=df_tabular[col], color='green')
+    plt.title(col)
 plt.tight_layout()
 plt.show()
 
-# Violin plotlar
-plt.figure(figsize=(15, 10))
-sns.violinplot(data=X_numeric)
-plt.xticks(rotation=45)
+# Violin plot
+plt.figure(figsize=(12, 6))
+for i, col in enumerate(df_tabular.columns):
+    plt.subplot(2, (num_cols+1)//2, i + 1)
+    sns.violinplot(y=df_tabular[col], color='orange')
+    plt.title(col)
 plt.tight_layout()
 plt.show()
 
-# Scatter plot (girişlerin çıkışa göre davranışı)
-for col in X_numeric.columns:
-    plt.figure(figsize=(8, 6))
-    plt.scatter(X_numeric[col], y)
-    plt.xlabel(col)
-    plt.ylabel('output_column')
-    plt.title(f'{col} vs output_column')
-    plt.tight_layout()
-    plt.show()
+# Scatter plot
+plt.figure(figsize=(15, 10))
+for i, col in enumerate(df_tabular.columns[:-1]):
+    plt.subplot(2, (num_cols+1)//2, i + 1)
+    sns.scatterplot(x=df_tabular[col], y=df_tabular['Price'], color='purple')
+    plt.title(col + ' vs Fiyat')
+plt.tight_layout()
+plt.show()
 
 # Korelasyon matrisi
-corr_matrix = X_numeric.corr()
-
-# Korelasyon matrisinin görselleştirilmesi
-plt.figure(figsize=(10, 8))
+corr_matrix = df_tabular.corr().abs()
+plt.figure(figsize=(8, 6))
 sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f")
-plt.title('Korelasyon Matrisi')
-plt.tight_layout()
-plt.show()
-
-# Normalize edilmiş mutlak çapraz korelasyon haritası
-plt.figure(figsize=(10, 8))
-sns.heatmap(np.abs(corr_matrix), annot=True, cmap='coolwarm', fmt=".2f")
-plt.title('Normalize Edilmiş Mutlak Çapraz Korelasyon Haritası')
-plt.tight_layout()
+plt.title("Korelasyon Matrisi")
 plt.show()
