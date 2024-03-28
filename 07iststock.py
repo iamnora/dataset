@@ -3,7 +3,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # Veri setini yükle
-df = pd.read_csv('isedataset.csv')
+df = pd.read_csv('iststockoriginal.csv')
 
 # Veri setinin ilk birkaç satırını görüntüle
 print(df.head())
@@ -14,38 +14,46 @@ print(df.describe())
 # Veri setindeki eksik değerleri kontrol et
 print(df.isnull().sum())
 
-# Standartlaştırma
-numeric_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 'Predict']
-df[numeric_columns] = (df[numeric_columns] - df[numeric_columns].mean()) / df[numeric_columns].std()
 
+
+# Tarih-zaman sütununu uygun bir şekilde dönüştür
+df['Date'] = pd.to_datetime(df['Date'])
+
+
+# Standartlaştırma
+numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
+
+# 'Symbol' sütununu düşürmeden önce yalnızca sayısal sütunları içeren bir alt veri çerçevesi oluştur
+numeric_df = df[numeric_columns]
+
+# Korelasyon matrisini hesapla
+correlation_matrix = numeric_df.corr()
 # Yeni özellikler oluştur (opsiyonel)
 
 # Histogramlar
 df.hist(figsize=(12, 10))
 plt.show()
 
-# Korelasyon matrisi
-# Korelasyon matrisini hesapla
-# 'Date' sütununu veri setinden çıkar
-df.drop('Date', axis=1, inplace=True)
+
+
+
 
 # Korelasyon matrisini hesapla
-# Korelasyon matrisini hesapla
-correlation_matrix = df.drop(['Symbol'], axis=1).corr()
+#correlation_matrix = df.drop(['Symbol'], axis=1).corr()
 
 
 sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm')
-plt.title('Korelasyon Matrisi')
+plt.title('Correlation Matrix')
 plt.show()
 
 # Kutu grafiği
 sns.boxplot(data=df)
-plt.title('Kutu Grafiği')
+plt.title('Box Plot')
 plt.show()
 
 # Keman grafiği
 sns.violinplot(data=df)
-plt.title('Keman Grafiği')
+plt.title('Violin Plot')
 plt.show()
 
 # Scatter plot (Giriş vs. Çıkış)
