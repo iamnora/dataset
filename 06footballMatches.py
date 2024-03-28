@@ -5,31 +5,17 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from stringClassifier import classify_strings
 
-data = pd.read_csv('sh_car_price.csv', on_bad_lines='skip')
+data = pd.read_csv('footballmathces.csv')
 
+data["weather_data_condition"] = classify_strings(data["weather_data_condition"])
 
-
-for item in data:
-    try: 
-     data[item] = data[item].astype(float)
-    
-    except ValueError:
-     data[item] = classify_strings(data[item])
-
-data['Year'] = data["Year"].values.astype("float64")
-data['Date of Currency'] = data["Date of Currency"].values.astype("float64")
-
-
-
-  
- 
 
 
 
 
 # Giriş ve çıkış sütunlarını ayıralım
-X = data.drop(columns=['Price'])
-y = data['Price'] 
+X = data.drop(columns=['match_statistics_home_score'])
+y = data['match_statistics_home_score'] 
 #There were no prediction outputs so we used this field as an example
 
 # Veriyi ölçeklendir
@@ -39,7 +25,7 @@ y_scaled = scaler.fit_transform(y.values.reshape(-1, 1))
 
 # Veri setini tablo haline getirme
 df_tabular = pd.DataFrame(X_scaled, columns=X.columns)
-df_tabular['Price'] = y_scaled.flatten()
+df_tabular['Fiyat'] = y_scaled.flatten()
 
 # Veri setinin ilk birkaç satırını kontrol edelim
 print(data.head())
@@ -75,7 +61,7 @@ plt.show()
 plt.figure(figsize=(15, 10))
 for i, col in enumerate(df_tabular.columns[:-1]):
     plt.subplot(2, (num_cols+1)//2, i + 1)
-    sns.scatterplot(x=df_tabular[col], y=df_tabular['Price'], color='purple')
+    sns.scatterplot(x=df_tabular[col], y=df_tabular['Fiyat'], color='purple')
     plt.title(col + ' vs Fiyat')
 plt.tight_layout()
 plt.show()
