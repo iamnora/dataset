@@ -1,59 +1,76 @@
-import numpy as np
 import pandas as pd
+import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 
-# Önceden hazırlanmış ASL veri setini yükleyin
-df = pd.read_csv("sign_language_keypoints_csv.csv")  # Veri setinizin adını ve yolunu doğru şekilde belirtin
+dataset = pd.read_csv('sign_language_keypoints_csv.csv', sep=';')
+dataset.drop(columns=['Harf'], inplace=True)
 
-# Veri setinin özeti
-print("Veri setinin bilgileri:")
-print(df.info())
-print("hello")
 
-# Özellikler ve hedef değişken arasında ilişkiyi görselleştirme
-sns.pairplot(df, hue='Harf', diag_kind='hist')
+features = []
+for i in range(1, 22):
+    x_col = f'X{i}'
+    y_col = f'Y{i}'
+    features.extend([x_col, y_col])
+
+feature_data = {}
+for feature in features:
+    feature_data[f'Mean_{feature}'] = [dataset[feature].mean()]
+    feature_data[f'Std_{feature}'] = [dataset[feature].std()]
+    feature_data[f'Var_{feature}'] = [dataset[feature].var()]
+    feature_data[f'Min_{feature}'] = [dataset[feature].min()]
+    feature_data[f'Max_{feature}'] = [dataset[feature].max()]
+    feature_data[f'Mode_{feature}'] = [dataset[feature].mode().values[0]]
+    feature_data[f'Median_{feature}'] = [dataset[feature].median()]
+    feature_data[f'Quantile1_{feature}'] = [dataset[feature].quantile(0.25)]
+    feature_data[f'Quantile3_{feature}'] = [dataset[feature].quantile(0.75)]
+    feature_data[f'Skew_{feature}'] = [dataset[feature].skew()]
+    feature_data[f'Kurt_{feature}'] = [dataset[feature].kurt()]
+
+feature_df = pd.DataFrame(feature_data)
+
+
+feature_df = pd.DataFrame(feature_data)
+
+feature_df.to_csv('Feature_Extraction_Results.csv', index=False)
+
+correlation_matrix = dataset.corr()
+correlation_matrix.to_csv('Correlation_Matrix.csv')
+
+sns.heatmap(np.abs(correlation_matrix), annot=True, cmap='coolwarm', vmin=0, vmax=1, fmt='.2f')
+plt.title('Normalized Absolute Cross-Correlation Map')
 plt.show()
 
-# Veri setindeki her sütunun histogramını çizin
-for column in df.columns:
-    plt.figure(figsize=(8, 5))
-    sns.histplot(df[column], kde=True)
-    plt.title(f"{column} Histogram")
+# Histogram
+for column in dataset.columns:
+    plt.hist(dataset[column], bins=30, color='skyblue', edgecolor='black')
     plt.xlabel(column)
-    plt.ylabel("Frequency")
+    plt.ylabel('Frequency')
+    plt.title(f'Histogram of {column}')
+    plt.grid(axis='y', alpha=0.75)
     plt.show()
 
-# Box plot çizimi
-for column in df.columns:
-    plt.figure(figsize=(8, 5))
-    sns.boxplot(x='letter', y=column, data=df)
-    plt.title(f"{column} vs Letter Box Plot")
-    plt.xlabel("Letter")
-    plt.ylabel(column)
+# Scatter plot
+for i in range(len(dataset.columns)):
+    for j in range(i + 1, len(dataset.columns)):
+        plt.scatter(dataset.iloc[:, i], dataset.iloc[:, j], color='skyblue', edgecolor='black', s=10)
+        plt.title(f'Scatter Plot of {dataset.columns[i]}-{dataset.columns[j]}')
+        plt.grid(alpha=0.75)
+        plt.show()
+
+# Violin plot
+for column in dataset.columns:
+    sns.violinplot(y=dataset[column], color='skyblue')
+    plt.title(f'Violin Plot of {column}')
     plt.show()
 
-# Violin plot çizimi
-for column in df.columns:
-    plt.figure(figsize=(8, 5))
-    sns.violinplot(x='letter', y=column, data=df)
-    plt.title(f"{column} vs Letter Violin Plot")
-    plt.xlabel("Letter")
-    plt.ylabel(column)
+# Box plot
+for column in dataset.columns:
+    plt.boxplot(dataset[column])
+    plt.title(f'Box Plot of {column}')
     plt.show()
 
-# Özellikleri ve hedef değişkeni ayırma
-X = df.drop(columns=["letter"])
-y = df["letter"]
-
-# Verileri standardize etme
 scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
-
-# Normalleştirilmiş mutlak çapraz korelasyon haritası oluşturma
-corr = np.abs(np.corrcoef(X_scaled.T))
-plt.figure(figsize=(10, 8))
-sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f", xticklabels=X.columns, yticklabels=X.columns)
-plt.title("Normalized Absolute Cross-Correlation Map")
-plt.show()
+dataset_standardized = pd.DataFrame(scaler.fit_transform(dataset), columns=dataset.columns)
+dataset_standardized.to_csv('Standardized_Columns.csv', index=False)
