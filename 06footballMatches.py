@@ -25,7 +25,7 @@ y_scaled = scaler.fit_transform(y.values.reshape(-1, 1))
 
 # Veri setini tablo haline getirme
 df_tabular = pd.DataFrame(X_scaled, columns=X.columns)
-df_tabular['Fiyat'] = y_scaled.flatten()
+df_tabular['match_statistics_home_score'] = y_scaled.flatten()
 
 # Veri setinin ilk birkaç satırını kontrol edelim
 print(data.head())
@@ -61,8 +61,8 @@ plt.show()
 plt.figure(figsize=(15, 10))
 for i, col in enumerate(df_tabular.columns[:-1]):
     plt.subplot(2, (num_cols+1)//2, i + 1)
-    sns.scatterplot(x=df_tabular[col], y=df_tabular['Fiyat'], color='purple')
-    plt.title(col + ' vs Fiyat')
+    sns.scatterplot(x=df_tabular[col], y=df_tabular['match_statistics_home_score'], color='purple')
+    plt.title(col + ' vs match_statistics_home_score')
 plt.tight_layout()
 plt.show()
 
