@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 # Preprocessing
 # Standardization of inputs
 from sklearn.preprocessing import StandardScaler
+import pandas as pd
+
+
 
 df = pd.read_csv('common_dataset_touch_features_offset.csv')
 
