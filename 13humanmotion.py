@@ -1,78 +1,55 @@
 import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-import csv
-# Veri setini yükleyin 
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+import joblib
 
+# Load the data
+data = pd.read_csv('humanmotion.csv')
 
-# CSV dosyasını oku
-df = pd.read_csv('humanmotion.csv', thousands=',', decimal='.', header=0)
+# Data Cleaning: Convert columns to numeric and handle errors
+numeric_columns = ['gyro_x', 'gyro_y', 'gyro_z', 'accel_x', 'accel_z']
+for col in numeric_columns:
+    data[col] = pd.to_numeric(data[col], errors='coerce')
 
-# İlk satırı başlık olarak atla
-df = df.drop(index=0)
+# Drop any rows with NaN values that were introduced by conversion errors
+data = data.dropna()
 
-# Sütun adlarını belirle
-df.columns = ["gyro_x", "gyro_y", "gyro_z", "accel_x", "accel_y", "accel_z", "std_acc_30", "std_gyro_10", "mean_acc_20", "mean_gyro_20", "max_acc_15", "min_acc_20", "Output"]
+# Preprocess the data
+# Encode the target variable
+label_encoder = LabelEncoder()
+data['Output'] = label_encoder.fit_transform(data['Output'])
 
-# Veri setini görüntüle
-print(df.head())
-
-# 'Output' sütununu kaldır
-X = df.drop(columns=["Output"])
-
-# Veri setini analiz et veya işlemlere devam et
-
-
-# Standartlaştırma
-from sklearn.preprocessing import StandardScaler, scale
-
-# Ölçeklendirme nesnesini tanımla
+# Scale the feature variables
 scaler = StandardScaler()
+feature_columns = [col for col in data.columns if col != 'Output']
+data[feature_columns] = scaler.fit_transform(data[feature_columns])
 
-# Veriyi ölçeklendir
-scaled_data = scaler.fit_transform(X)
+# Split the data into features and target
+X = data[feature_columns]
+y = data['Output']
 
-# Ölçeklendirilmiş veriyi DataFrame'e dönüştür
-df_scaled = pd.DataFrame(scaled_data, columns=X.columns)
+# Split the dataset using the specified parameters
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=47, stratify=y
+)
 
-# 'Output' sütununu ekleyin
-df_scaled["Output"] = df["Output"]
+# Model training using Stratified 10-fold Cross-Validation
+model = RandomForestClassifier()
+stratified_kfold = StratifiedKFold(n_splits=10)
+cv_scores = cross_val_score(model, X_train, y_train, cv=stratified_kfold, scoring='accuracy')
+print('Cross-Validation Scores:', cv_scores)
+print('Average CV Accuracy:', cv_scores.mean())
 
-# Scatterplot'u çiz
-sns.scatterplot(data=df_scaled, x='gyro_x', y='gyro_y', hue='Output')
+# Train the model on the training data
+model.fit(X_train, y_train)
 
+# Evaluate the model on the test data
+y_pred = model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+print('Test Accuracy:', accuracy)
 
-# Görselleştirmeler
-# Örnek olarak, 2D scatter plot
-plt.figure(figsize=(8, 6))
-sns.scatterplot(data=df_scaled, x='gyro_x', y='gyro_y', hue='Output')
-plt.title('Scatter Plot of gyro_x vs gyro_y with Output')
-plt.show()
-
-# Histogramlar
-plt.figure(figsize=(10, 6))
-sns.histplot(data=df, x='gyro_x', hue='Output', multiple='stack', kde=True)
-plt.title('Histogram of gyro_x with Output')
-plt.show()
-
-# Kutu grafikleri
-plt.figure(figsize=(10, 6))
-sns.boxplot(data=df, x='Output', y='gyro_x')
-plt.title('Box Plot of gyro_x by Output')
-plt.show()
-
-# Keman grafikleri
-plt.figure(figsize=(10, 6))
-sns.violinplot(data=df, x='Output', y='gyro_x')
-plt.title('Violin Plot of gyro_x by Output')
-plt.show()
-
-# Çapraz korelasyon haritası
-numeric_df = df.drop(columns=["Output"])
-corr = numeric_df.corr()
-plt.figure(figsize=(10, 8))
-sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f")
-plt.title('Correlation Heatmap')
-plt.show()
-
+# Save the model
+joblib.dump(model, 'human_motion_classifier.pkl')
+print('Model saved as human_motion_classifier.pkl')
