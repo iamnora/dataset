@@ -1,83 +1,56 @@
-import numpy as np
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split, KFold, cross_val_score
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor  
+from sklearn.svm import SVR
+from sklearn.metrics import r2_score
+from sklearn.preprocessing import LabelEncoder
+import joblib
 
-# Özellikleri içeren veri çerçevesini oluşturma
-df = pd.read_csv('bitcoindataset.csv')
-print(df.head())
 
-# Özellikleri hesapla
-df_features = pd.DataFrame()
+# Load the data
+data = pd.read_csv('bitcoindataset.csv')
 
-# MA 20
-df_features['MA_20'] = df[['Open', 'High', 'Low', 'Close']].rolling(window=20).mean().iloc[-1]
+# Encode the categorical 'Command' column
+encoder = LabelEncoder()
+data['Command_Encoded'] = encoder.fit_transform(data['Command'])
+data.drop('Command', axis=1, inplace=True)
 
-# MA 20 close
-df_features['MA_20_close'] = df['Close'].rolling(window=20).mean().iloc[-1]
+# Set up features and target
+X = data.drop('Close_Predictions', axis=1)
+y = data['Close_Predictions']
 
-# STD 10 high
-df_features['STD_10_high'] = df['High'].rolling(window=10).std().iloc[-1]
+# Define models for cross-validation
+models = {
+    "Linear Regression": LinearRegression(),
+    "Random Forest": RandomForestRegressor(random_state=47),
+    "SVR": SVR()
+}
 
-# PP 10 vol
-df_features['PP_10_vol'] = df['Volume'].diff().abs().rolling(window=10).max().iloc[-1]
+# Perform K-Fold cross-validation
+cv = KFold(n_splits=10)
+results = {}
+for name, model in models.items():
+    scores = cross_val_score(model, X, y, scoring='r2', cv=cv)
+    results[name] = scores.mean()
+print("Cross-validation results:", results)
 
-# Bağımsız ve bağımlı değişkenleri ayır
-X = df.drop(['Close', 'Command'], axis=1)  # Bağımsız değişkenler
-y = df['Close_Predictions']  # Bağımlı değişkenler
-print("X shape:", X.shape)
-print("y shape:", y.shape)
+# Train-test split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=47, stratify=None)
 
-# Veriyi ölçeklendir
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
-y_scaled = scaler.fit_transform(y.values.reshape(-1, 1))
+# Train the best model (Linear Regression in this case)
+model = LinearRegression()
+model.fit(X_train, y_train)
 
-# Veri setini tablo haline getirme
-df_tabular = pd.DataFrame(X_scaled, columns=X.columns)
-df_tabular['Close_Predictions'] = y_scaled.flatten()
+# Evaluation
+train_predictions = model.predict(X_train)
+train_r2 = r2_score(y_train, train_predictions)
+test_predictions = model.predict(X_test)
+test_r2 = r2_score(y_test, test_predictions)
+print("Train R² score:", train_r2)
+print("Test R² score:", test_r2)
 
-# Histogramlar
-plt.figure(figsize=(12, 6))
-num_cols = len(df_tabular.columns)
-for i, col in enumerate(df_tabular.columns):
-    plt.subplot(2, (num_cols+1)//2, i + 1)
-    sns.histplot(df_tabular[col], kde=True, color='blue', bins=10)
-    plt.title(col)
-plt.tight_layout()
-plt.show()
-
-# Box plot
-plt.figure(figsize=(12, 6))
-for i, col in enumerate(df_tabular.columns):
-    plt.subplot(2, (num_cols+1)//2, i + 1)
-    sns.boxplot(y=df_tabular[col], color='green')
-    plt.title(col)
-plt.tight_layout()
-plt.show()
-
-# Violin plot
-plt.figure(figsize=(12, 6))
-for i, col in enumerate(df_tabular.columns):
-    plt.subplot(2, (num_cols+1)//2, i + 1)
-    sns.violinplot(y=df_tabular[col], color='orange')
-    plt.title(col)
-plt.tight_layout()
-plt.show()
-
-# Scatter plot
-plt.figure(figsize=(15, 10))
-for i, col in enumerate(df_tabular.columns[:-1]):
-    plt.subplot(2, (num_cols+1)//2, i + 1)
-    sns.scatterplot(x=df_tabular[col], y=df_tabular['Close_Predictions'], color='purple')
-    plt.title(col + ' vs Close_Predictions')
-plt.tight_layout()
-plt.show()
-
-# Korelasyon matrisi
-corr_matrix = df_tabular.corr().abs()
-plt.figure(figsize=(8, 6))
-sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f")
-plt.title("Korelasyon Matrisi")
-plt.show()
+# Save the model
+model_filename = 'linear_regression_model.joblib'
+joblib.dump(model, model_filename)
+print(f"Model saved as {model_filename}")
