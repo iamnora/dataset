@@ -1,73 +1,86 @@
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-import numpy as np
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split, cross_validate, StratifiedKFold
+from sklearn.compose import make_column_selector as selector
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
+import joblib
+from stringClassifier import classify_strings
+from sklearn.pipeline import make_pipeline
 
-# Veri kümesini yükle
-df = pd.read_csv('accident_news.csv')
+# Veriyi yükle
+adult_census = pd.read_csv("accident_news.csv")
 
-# Veri ön işleme
-# Veri kümesinin başını kontrol et
-print(df.head())
+# Sadece istediğiniz sütunları seçin
+selected_columns = ["Content", "Location", "Province_Code", "Vehicles", "Death"]
+data = adult_census[selected_columns]
 
-# Veri kümesinin bilgilerini kontrol et
-print(df.info())
+# Sınıflandırma için metin sütunlarını işle
+data["Content"] = classify_strings(data["Content"])
+data["Location"] = classify_strings(data["Location"])
+data["Province_Code"] = classify_strings(data["Province_Code"])
+data["Vehicles"] = classify_strings(data["Vehicles"])
 
-# Sayısal olmayan sütunları belirle
-non_numeric_columns = df.select_dtypes(exclude=['number']).columns
-print("Sayısal olmayan sütunlar:", non_numeric_columns)
+# Hedef değişken
+target_name = "Injured"
+target = adult_census[target_name]
 
-# Sayısal olmayan sütunları veri kümesinden kaldır
-df = df.drop(columns=non_numeric_columns)
+# Önişleme
+categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
+numerical_preprocessor = StandardScaler()
 
-# Standartlaştırma
-scaler = StandardScaler()
-df_standardized = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
+preprocessor = ColumnTransformer([
+    ('one-hot-encoder', categorical_preprocessor, ["Content", "Location", "Province_Code"]),
+    ('standard-scaler', numerical_preprocessor, ["Vehicles", "Death"])])
 
-# Yeni özellikler çıkarımı
-# Burada gerekli feature engineering işlemlerini gerçekleştirebilirsiniz
+# Modeller
+models = {
+    "Logistic Regression": LogisticRegression(max_iter=500),
+    "Random Forest": RandomForestClassifier(),
+    "Support Vector Machine": SVC()
+}
 
-# Histogramlar
-for column in df.columns:
-    plt.figure(figsize=(8, 6))
-    sns.histplot(df[column], bins=20, kde=True, color='skyblue')
-    plt.title(f'{column} Dağılımı')
-    plt.xlabel(column)
-    plt.ylabel('Frekans')
-    plt.grid(True)
-    plt.show()
+# Performans metrikleri
+metrics = {}
 
-# Kutu Grafiği (Box Plot)
-for column in df.columns:
-    plt.figure(figsize=(8, 6))
-    sns.boxplot(y=df[column], color='skyblue')
-    plt.title(f'{column} Kutu Grafiği')
-    plt.ylabel(column)
-    plt.grid(True)
-    plt.show()
+# Model seçimi ve değerlendirme
+best_model = None
+best_score = 0
 
-# Violin Grafiği
-for column in df.columns:
-    plt.figure(figsize=(8, 6))
-    sns.violinplot(y=df[column], color='skyblue')
-    plt.title(f'{column} Violin Grafiği')
-    plt.ylabel(column)
-    plt.grid(True)
-    plt.show()
+for model_name, model in models.items():
+    pipeline = make_pipeline(preprocessor, model)
+    
+    # Çapraz doğrulama
+    cv_results = cross_validate(pipeline, data, target, cv=StratifiedKFold(n_splits=10))
+    scores = cv_results["test_score"]
+    mean_accuracy = scores.mean()
+    std_accuracy = scores.std()
+    
+    print(f"{model_name} Cross Validation Accuracy: {mean_accuracy:.3f} +/- {std_accuracy:.3f}")
+    
+    # En iyi modeli seç
+    if mean_accuracy > best_score:
+        best_model = pipeline
+        best_score = mean_accuracy
 
-# Scatter Plot
-plt.figure(figsize=(10, 6))
-sns.scatterplot(data=df, x='Death', y='Injured', color='skyblue')
-plt.title('Death vs. Injured Scatter Plot')
-plt.xlabel('Death')
-plt.ylabel('Injured')
-plt.grid(True)
-plt.show()
+# Train-test ayırma
+data_train, data_test, target_train, target_test = train_test_split(data, target, test_size=0.2, random_state=47, stratify=target)
 
-# Korelasyon Matrisi
-correlation_matrix = df_standardized.corr()
-plt.figure(figsize=(10, 8))
-sns.heatmap(np.abs(correlation_matrix), annot=True, cmap='coolwarm', vmin=0, vmax=1)
-plt.title('Normalize Edilmiş Mutlak Çapraz Korelasyon Haritası')
-plt.show()
+# En iyi modelle eğitim
+best_model.fit(data_train, target_train)
+
+# Eğitim seti performans metrikleri
+train_predictions = best_model.predict(data_train)
+train_accuracy = accuracy_score(target_train, train_predictions)
+print("Train Accuracy:", train_accuracy)
+
+# Test seti performans metrikleri
+test_predictions = best_model.predict(data_test)
+test_accuracy = accuracy_score(target_test, test_predictions)
+print("Test Accuracy:", test_accuracy)
+
+# En iyi modeli kaydet
+joblib.dump(best_model, "best_model.pkl")
