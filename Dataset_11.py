@@ -10,22 +10,24 @@ from sklearn.metrics import accuracy_score
 import joblib
 from stringClassifier import classify_strings
 from sklearn.pipeline import make_pipeline
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Veriyi yükle
 adult_census = pd.read_csv("accident_news.csv")
 
 # Sadece istediğiniz sütunları seçin
-selected_columns = ["Content", "Location", "Province_Code", "Vehicles", "Death"]
+selected_columns = ["Content", "Location", "Province_Code", "otomobil", "motosiklet", "kamyonet"]
 data = adult_census[selected_columns]
 
 # Sınıflandırma için metin sütunlarını işle
 data["Content"] = classify_strings(data["Content"])
 data["Location"] = classify_strings(data["Location"])
 data["Province_Code"] = classify_strings(data["Province_Code"])
-data["Vehicles"] = classify_strings(data["Vehicles"])
+
 
 # Hedef değişken
-target_name = "Injured"
+target_name = "Death"
 target = adult_census[target_name]
 
 # Önişleme
@@ -34,7 +36,7 @@ numerical_preprocessor = StandardScaler()
 
 preprocessor = ColumnTransformer([
     ('one-hot-encoder', categorical_preprocessor, ["Content", "Location", "Province_Code"]),
-    ('standard-scaler', numerical_preprocessor, ["Vehicles", "Death"])])
+    ('standard-scaler', numerical_preprocessor, ["otomobil", "motosiklet", "kamyonet"])])
 
 # Modeller
 models = {
@@ -83,4 +85,33 @@ test_accuracy = accuracy_score(target_test, test_predictions)
 print("Test Accuracy:", test_accuracy)
 
 # En iyi modeli kaydet
-joblib.dump(best_model, "best_model.pkl")
+joblib.dump(best_model, "Dataset11_BestModel")
+
+
+# Veri öncesi histogramlar
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data.columns):
+    plt.subplot(2, 3, i + 1)
+    sns.histplot(data[column], kde=True)
+    plt.title(column)
+plt.tight_layout()
+plt.show()
+
+# Veri öncesi violin plotlar
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data.columns):
+    plt.subplot(2, 3, i + 1)
+    sns.violinplot(y=data[column])
+    plt.title(column)
+plt.tight_layout()
+plt.show()
+
+# Veri öncesi box plotlar
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data.columns):
+    plt.subplot(2, 3, i + 1)
+    sns.boxplot(y=data[column])
+    plt.title(column)
+plt.tight_layout()
+plt.show()
+
