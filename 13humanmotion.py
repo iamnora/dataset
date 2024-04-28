@@ -1,55 +1,110 @@
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.model_selection import train_test_split, cross_validate, StratifiedKFold
+from sklearn.compose import make_column_selector as selector
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
 import joblib
+from stringClassifier import classify_strings
+from sklearn.pipeline import make_pipeline
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Load the data
-data = pd.read_csv('humanmotion.csv')
+adult_census = pd.read_csv("human_motion_detection.csv", sep=';')
 
-# Data Cleaning: Convert columns to numeric and handle errors
-numeric_columns = ['gyro_x', 'gyro_y', 'gyro_z', 'accel_x', 'accel_z']
-for col in numeric_columns:
-    data[col] = pd.to_numeric(data[col], errors='coerce')
 
-# Drop any rows with NaN values that were introduced by conversion errors
-data = data.dropna()
+selected_columns = ["gyro_x", "gyro_y", "accel_z", "std_acc_30", "mean_gyro_20", "max_acc_15"]
+data = adult_census[selected_columns]
 
-# Preprocess the data
-# Encode the target variable
-label_encoder = LabelEncoder()
-data['Output'] = label_encoder.fit_transform(data['Output'])
 
-# Scale the feature variables
-scaler = StandardScaler()
-feature_columns = [col for col in data.columns if col != 'Output']
-data[feature_columns] = scaler.fit_transform(data[feature_columns])
 
-# Split the data into features and target
-X = data[feature_columns]
-y = data['Output']
 
-# Split the dataset using the specified parameters
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=47, stratify=y
-)
 
-# Model training using Stratified 10-fold Cross-Validation
-model = RandomForestClassifier()
-stratified_kfold = StratifiedKFold(n_splits=10)
-cv_scores = cross_val_score(model, X_train, y_train, cv=stratified_kfold, scoring='accuracy')
-print('Cross-Validation Scores:', cv_scores)
-print('Average CV Accuracy:', cv_scores.mean())
+target_name = "Output"
+target = adult_census[target_name]
 
-# Train the model on the training data
-model.fit(X_train, y_train)
 
-# Evaluate the model on the test data
-y_pred = model.predict(X_test)
-accuracy = accuracy_score(y_test, y_pred)
-print('Test Accuracy:', accuracy)
+categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
+numerical_preprocessor = StandardScaler()
 
-# Save the model
-joblib.dump(model, 'human_motion_classifier.pkl')
-print('Model saved as human_motion_classifier.pkl')
+preprocessor = ColumnTransformer([
+    ('one-hot-encoder', categorical_preprocessor, []),
+    ('standard-scaler', numerical_preprocessor, ["gyro_x", "gyro_y", "accel_z", "std_acc_30", "mean_gyro_20", "max_acc_15"])])
+
+
+models = {
+    "Logistic Regression": LogisticRegression(max_iter=500),
+    "Random Forest": RandomForestClassifier(),
+    "Support Vector Machine": SVC()
+}
+
+
+
+
+best_model = None
+best_score = 0
+
+for model_name, model in models.items():
+    pipeline = make_pipeline(preprocessor, model)
+    
+
+    cv_results = cross_validate(pipeline, data, target, cv=StratifiedKFold(n_splits=10))
+    scores = cv_results["test_score"]
+    mean_accuracy = scores.mean()
+    std_accuracy = scores.std()
+    
+    print(f"{model_name} Cross Validation Accuracy: {mean_accuracy:.3f} +/- {std_accuracy:.3f}")
+    
+ 
+    if mean_accuracy > best_score:
+        best_model = pipeline
+        best_score = mean_accuracy
+
+
+data_train, data_test, target_train, target_test = train_test_split(data, target, test_size=0.2, random_state=47, stratify=target)
+
+
+best_model.fit(data_train, target_train)
+
+
+train_predictions = best_model.predict(data_train)
+train_accuracy = accuracy_score(target_train, train_predictions)
+print("Train Accuracy:", train_accuracy)
+
+
+test_predictions = best_model.predict(data_test)
+test_accuracy = accuracy_score(target_test, test_predictions)
+print("Test Accuracy:", test_accuracy)
+
+
+joblib.dump(best_model, "Dataset13_BestModel")
+
+
+
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data.columns):
+    plt.subplot(2, 3, i + 1)
+    sns.histplot(data[column], kde=True)
+    plt.title(column)
+plt.tight_layout()
+plt.show()
+
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data.columns):
+    plt.subplot(2, 3, i + 1)
+    sns.violinplot(y=data[column])
+    plt.title(column)
+plt.tight_layout()
+plt.show()
+
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data.columns):
+    plt.subplot(2, 3, i + 1)
+    sns.boxplot(y=data[column])
+    plt.title(column)
+plt.tight_layout()
+plt.show()
+
