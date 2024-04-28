@@ -1,74 +1,109 @@
+from matplotlib import pyplot as plt
 import pandas as pd
-import numpy as np
+from sklearn.model_selection import train_test_split, cross_validate, StratifiedKFold
+from sklearn.compose import make_column_selector as selector
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
+import joblib
 import seaborn as sns
-import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
-from stringClassifier import classify_strings
 
-data = pd.read_csv('footballmathces.csv')
+from sklearn.pipeline import make_pipeline
 
-data["weather_data_condition"] = classify_strings(data["weather_data_condition"])
+# Veriyi yükle
+adult_census = pd.read_csv("footballmathces_v2.csv")
+
+# Sadece istediğiniz sütunları seçin
+selected_columns = [ 'home_team_data_squad_size', 'home_team_data_team_value', 'home_team_data_team_','away_team_data_squad_size', 'away_team_data_team_value', 'away_team_data_team_trophies']
+data = adult_census[selected_columns]
+
+
+# Hedef değişken
+target_name = "Result"
+target = adult_census[target_name]
+
+# Önişleme
+numerical_preprocessor = StandardScaler()
+
+preprocessor = ColumnTransformer([
+
+    ('standard-scaler', numerical_preprocessor, selected_columns)])
+
+# Modeller
+models = {
+    "Logistic Regression": LogisticRegression(max_iter=500),
+    "Random Forest": RandomForestClassifier(),
+    "Support Vector Machine": SVC()
+}
+
+
+# Model seçimi ve değerlendirme
+best_model = None
+best_score = 0
+
+for model_name, model in models.items():
+    pipeline = make_pipeline(preprocessor, model)
+    
+    # Çapraz doğrulama
+    cv_results = cross_validate(pipeline, data, target, cv=StratifiedKFold(n_splits=10))
+    scores = cv_results["test_score"]
+    mean_accuracy = scores.mean()
+    std_accuracy = scores.std()
+    
+    print(f"{model_name} Cross Validation Accuracy: {mean_accuracy:.3f} +/- {std_accuracy:.3f}")
+    
+    # En iyi modeli seç
+    if mean_accuracy > best_score:
+        best_model = pipeline
+        best_score = mean_accuracy
+
+# Train-test ayırma
+data_train, data_test, target_train, target_test = train_test_split(data, target, test_size=0.2, random_state=47, stratify=target)
+
+# En iyi modelle eğitim
+best_model.fit(data_train, target_train)
+
+# Eğitim seti performans metrikleri
+train_predictions = best_model.predict(data_train)
+train_accuracy = accuracy_score(target_train, train_predictions)
+print("Train Accuracy:", train_accuracy)
+
+# Test seti performans metrikleri
+test_predictions = best_model.predict(data_test)
+test_accuracy = accuracy_score(target_test, test_predictions)
+print("Test Accuracy:", test_accuracy)
+
+# En iyi modeli kaydet
+joblib.dump(best_model, "best_model.pkl")
 
 
 
 
 
-# Giriş ve çıkış sütunlarını ayıralım
-X = data.drop(columns=['match_statistics_home_score'])
-y = data['match_statistics_home_score'] 
-#There were no prediction outputs so we used this field as an example
 
-# Veriyi ölçeklendir
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
-y_scaled = scaler.fit_transform(y.values.reshape(-1, 1))
 
-# Veri setini tablo haline getirme
-df_tabular = pd.DataFrame(X_scaled, columns=X.columns)
-df_tabular['match_statistics_home_score'] = y_scaled.flatten()
 
-# Veri setinin ilk birkaç satırını kontrol edelim
-print(data.head())
-
-# Veri setindeki sütunların istatistiksel bilgilerini alalım
-print(data.describe())
-
-# Histogramlar
-data.hist(figsize=(15, 10))
-plt.tight_layout()
-plt.show()
-num_cols = len(df_tabular.columns)
-
-# Box plotlar
+# Eğitim verisi histogramları
 plt.figure(figsize=(12, 6))
-for i, col in enumerate(df_tabular.columns):
-    plt.subplot(2, (num_cols+1)//2, i + 1)
-    sns.boxplot(y=df_tabular[col], color='green')
-    plt.title(col)
+for i, column in enumerate(data_train.columns):
+    plt.subplot(2, 3, i + 1)
+    sns.histplot(data_train[column], kde=True)
+    plt.title(column)
 plt.tight_layout()
 plt.show()
 
-# Violin plot
+
+
+# Eğitim verisi violin plotları
 plt.figure(figsize=(12, 6))
-for i, col in enumerate(df_tabular.columns):
-    plt.subplot(2, (num_cols+1)//2, i + 1)
-    sns.violinplot(y=df_tabular[col], color='orange')
-    plt.title(col)
+for i, column in enumerate(data_train.columns):
+    plt.subplot(2, 3, i + 1)
+    sns.violinplot(x=target_train, y=data_train[column])
+    plt.title(column)
 plt.tight_layout()
 plt.show()
 
-# Scatter plot
-plt.figure(figsize=(15, 10))
-for i, col in enumerate(df_tabular.columns[:-1]):
-    plt.subplot(2, (num_cols+1)//2, i + 1)
-    sns.scatterplot(x=df_tabular[col], y=df_tabular['match_statistics_home_score'], color='purple')
-    plt.title(col + ' vs match_statistics_home_score')
-plt.tight_layout()
-plt.show()
 
-# Korelasyon matrisi
-corr_matrix = df_tabular.corr().abs()
-plt.figure(figsize=(8, 6))
-sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f")
-plt.title("Korelasyon Matrisi")
-plt.show()

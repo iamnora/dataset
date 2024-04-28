@@ -1,59 +1,87 @@
 import pandas as pd
-import seaborn as sns
+from sklearn.model_selection import train_test_split, cross_validate, KFold
+from sklearn.compose import make_column_selector as selector
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import r2_score
+from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
+import seaborn as sns
+import joblib
 
-# Veri setini yükle
-df = pd.read_csv('iststockoriginal.csv')
+# Veriyi yükle
+adult_census = pd.read_csv("isedataset.csv")
 
-# Veri setinin ilk birkaç satırını görüntüle
-print(df.head())
+# Sadece istediğiniz sütunları seçin
+selected_columns = ["Open","High","Low", "Close"]
+data = adult_census[selected_columns]
 
-# Veri setinin betimsel istatistiklerini görüntüle
-print(df.describe())
+# Eksik değerleri doldur
+imputer = SimpleImputer(strategy="mean")
+data_filled = imputer.fit_transform(data)
+data_filled = pd.DataFrame(data_filled, columns=data.columns)
 
-# Veri setindeki eksik değerleri kontrol et
-print(df.isnull().sum())
+# Hedef değişken
+target_name = "Predict"
+target = adult_census[target_name]
 
-# Tarih-zaman sütununu uygun bir şekilde dönüştür
-df['Date'] = pd.to_datetime(df['Date'])
+# Önişleme
+categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
+numerical_preprocessor = StandardScaler()
 
-# Standartlaştırma
-numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
+preprocessor = ColumnTransformer([
+    ('one-hot-encoder', categorical_preprocessor, selector(dtype_include="object")),
+    ('standard-scaler', numerical_preprocessor, selector(dtype_exclude="object"))
+])
 
-# 'Symbol' sütununu düşürmeden önce yalnızca sayısal sütunları içeren bir alt veri çerçevesi oluştur
-numeric_df = df[numeric_columns]
+# Modeli oluştur
+model = make_pipeline(preprocessor, LinearRegression())
 
-# Korelasyon matrisini hesapla
-correlation_matrix = numeric_df.corr()
-# Yeni özellikler oluştur (opsiyonel)
+# Veriyi eğitim ve test setlerine ayır
+data_train, data_test, target_train, target_test = train_test_split(data_filled, target, test_size=0.2, random_state=47)
 
-# Histogramlar
-df.hist(figsize=(12, 10))
+# Modeli eğit
+_ = model.fit(data_train, target_train)
+
+# Eğitim seti üzerinde tahminler yap
+train_predictions = model.predict(data_train)
+
+# Eğitim seti performansını ölç
+train_r2 = r2_score(target_train, train_predictions)
+
+# Test seti üzerinde tahminler yap
+test_predictions = model.predict(data_test)
+
+# Test seti performansını ölç
+test_r2 = r2_score(target_test, test_predictions)
+
+print("Eğitim R^2 skoru:", train_r2)
+print("Test R^2 skoru:", test_r2)
+
+# Modeli kaydet
+joblib.dump(model, "Dataset12_BestModel.pkl")
+
+# Eğitim verisi violin plotları
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data_train.columns):
+    plt.subplot(2, 3, i + 1)
+    sns.violinplot(x=target_train, y=data_train[column])
+    plt.title(column)
+    
+
+plt.tight_layout()
 plt.show()
 
-# Korelasyon matrisini hesapla
-#correlation_matrix = df.drop(['Symbol'], axis=1).corr()
 
-sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm')
-plt.title('Correlation Matrix')
+# Eğitim verisi box plotları
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data_train.columns):
+    plt.subplot(2, 3, i + 1)
+    sns.boxplot(x=target_train, y=data_train[column])
+    plt.title(column)
+plt.tight_layout()
 plt.show()
 
-# Kutu grafiği
-sns.boxplot(data=df)
-plt.title('Box Plot')
-plt.show()
 
-# Keman grafiği
-sns.violinplot(data=df)
-plt.title('Violin Plot')
-plt.show()
-
-# Scatter plot (Giriş vs. Çıkış)
-sns.scatterplot(x='Open', y='Predict', data=df)
-plt.title('Open vs. Predict')
-plt.show()
-
-# Normalleştirilmiş mutlak çapraz-korelasyon haritası
-sns.heatmap(df.drop(['Symbol'], axis=1).corr().abs(), annot=True, cmap='coolwarm')
-plt.title('Normalleştirilmiş Mutlak Çapraz-Korelasyon Haritası')
-plt.show()
