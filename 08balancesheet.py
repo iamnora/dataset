@@ -15,7 +15,7 @@ import joblib
 adult_census = pd.read_csv("BalanceSheetDataSet.csv")
 
 # Sadece istediğiniz sütunları seçin
-selected_columns = ["Nakit ve Nakit Benzerleri","Finansal Yatırımlar","Ticari Alacaklar","Finans Sektörü Faaliyetlerinden Alacaklar","Türkiye Cumhuriyet Merkez Bankası Hesabı","Diğer Alacaklar","Müşteri Sözleşmelerinden Doğan Varlıklar","İmtiyaz Sözleşmelerine İlişkin Finansal Varlıklar","Türev Araçlar","Stoklar","Peşin Ödenmiş Giderler"]
+selected_columns = ["Nakit ve Nakit Benzerleri","Ticari Alacaklar","Finans Sektörü Faaliyetlerinden Alacaklar","Türkiye Cumhuriyet Merkez Bankası Hesabı","Müşteri Sözleşmelerinden Doğan Varlıklar","İmtiyaz Sözleşmelerine İlişkin Finansal Varlıklar","Stoklar","Peşin Ödenmiş Giderler"]
 data = adult_census[selected_columns]
 
 
@@ -67,7 +67,6 @@ for i, column in enumerate(data_train.columns):
     plt.title(column)
 plt.tight_layout()
 plt.show()
-
 
 
 # Eğitim verisi violin plotları

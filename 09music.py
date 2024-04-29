@@ -11,12 +11,17 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib
 
+from stringClassifier import classify_strings
+
 # Veriyi yükle
 adult_census = pd.read_csv("Music Informations and Lyrics_ from Spotify and Musixmatch.csv")
 
 # Sadece istediğiniz sütunları seçin
-selected_columns = ["Track Duration(ms)","Danceability","Energy","Key","Loudness","Mode","Speechiness","Acousticness","Liveness","Valence","Tempo","Time_signature"]
+selected_columns = ["Artist","Artist Popularity","Artist Genres","Track Duration(ms)","Danceability","Energy","Key","Loudness","Acousticness","Liveness","Valence","Tempo"]
 data = adult_census[selected_columns]
+
+data["Artist"] = classify_strings(data["Artist"])
+data["Artist Genres"] = classify_strings(data["Artist Genres"])
 
 
 # Hedef değişken
