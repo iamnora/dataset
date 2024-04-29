@@ -1,58 +1,82 @@
 import pandas as pd
-import numpy as np
+from sklearn.model_selection import train_test_split, cross_validate, KFold
+from sklearn.compose import make_column_selector as selector
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import r2_score
+from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
 import seaborn as sns
+import joblib
 
-# Veri setini yükle
-df = pd.read_csv('Music Informations and Lyrics_ from Spotify and Musixmatch.csv')
+# Veriyi yükle
+adult_census = pd.read_csv("Music Informations and Lyrics_ from Spotify and Musixmatch.csv")
 
-# 'Date' sütununun varlığını kontrol et
-if 'Date' in df.columns:
-    # 'Date' sütununu veri çerçevesinden çıkar
-    df.drop(['Date'], axis=1, inplace=True)
-
-
-# Eksik değerleri doldur
-numeric_columns = df.select_dtypes(include=np.number).columns
-df[numeric_columns] = df[numeric_columns].fillna(df[numeric_columns].mean())
-
-categorical_columns = df.select_dtypes(exclude=np.number).columns
-df[categorical_columns] = df[categorical_columns].fillna(df[categorical_columns].mode().iloc[0])
-
-# Veri setini CSV dosyasına dönüştür
-df.to_csv("veriseti.csv", index=False)
-
-# Standardizasyon
-df[numeric_columns] = (df[numeric_columns] - df[numeric_columns].mean()) / df[numeric_columns].std()
-
-# Yeni özellikler çıkar
-# Örneğin, "Release Date" sütunundan yıl bilgisini çıkarabiliriz
-# Tarih verilerini doğru formata dönüştürmek için try-except bloğu kullanalım
-df['Release Year'] = pd.to_datetime(df['Release Date'], errors='coerce').dt.year
+# Sadece istediğiniz sütunları seçin
+selected_columns = ["Track Duration(ms)","Danceability","Energy","Key","Loudness","Mode","Speechiness","Acousticness","Liveness","Valence","Tempo","Time_signature"]
+data = adult_census[selected_columns]
 
 
+# Hedef değişken
+target_name = "Track Popularity"
+target = adult_census[target_name]
 
-# Histogramlar
-df.hist(figsize=(15, 10))
+# Önişleme
+categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
+numerical_preprocessor = StandardScaler()
+
+preprocessor = ColumnTransformer([
+    ('one-hot-encoder', categorical_preprocessor, selector(dtype_include="object")),
+    ('standard-scaler', numerical_preprocessor, selector(dtype_exclude="object"))
+])
+
+# Modeli oluştur
+model = make_pipeline(preprocessor, LinearRegression())
+
+# Veriyi eğitim ve test setlerine ayır
+data_train, data_test, target_train, target_test = train_test_split(data, target, test_size=0.2, random_state=47)
+
+# Modeli eğit
+_ = model.fit(data_train, target_train)
+
+# Eğitim seti üzerinde tahminler yap
+train_predictions = model.predict(data_train)
+
+# Eğitim seti performansını ölç
+train_r2 = r2_score(target_train, train_predictions)
+
+# Test seti üzerinde tahminler yap
+test_predictions = model.predict(data_test)
+
+# Test seti performansını ölç
+test_r2 = r2_score(target_test, test_predictions)
+
+print("Eğitim R^2 skoru:", train_r2)
+print("Test R^2 skoru:", test_r2)
+
+# Modeli kaydet
+joblib.dump(model, "musicModel.pkl")
+
+# Eğitim verisi histogramları
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data_train.columns):
+    plt.subplot(4, 4, i + 1)
+    sns.histplot(data_train[column], kde=True)
+    plt.title(column)
+plt.tight_layout()
 plt.show()
 
-# Korelasyon matrisi
-correlation_matrix = df.drop(['Release Date', 'Track Name', 'Artist', 'Artist Genres', 'Release Date', 'Lyrics'], axis=1).corr()
 
-# Korelasyon matrisinin görselleştirilmesi
-plt.figure(figsize=(12, 10))
-sns.heatmap(correlation_matrix.abs(), annot=True, cmap='coolwarm')
+
+# Eğitim verisi violin plotları
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data_train.columns):
+    plt.subplot(4, 4, i + 1)
+    sns.violinplot(x=target_train, y=data_train[column])
+    plt.title(column)
+plt.tight_layout()
 plt.show()
 
-# Box plot
-df.boxplot(figsize=(15, 10))
-plt.show()
 
-# Violin plot
-plt.figure(figsize=(15, 10))
-sns.violinplot(data=df, inner="point")
-plt.show()
-
-# Scatter plot
-sns.pairplot(df, diag_kind='hist')
-plt.show()

@@ -61,7 +61,7 @@ print("Eğitim R^2 skoru:", train_r2)
 print("Test R^2 skoru:", test_r2)
 
 # Modeli kaydet
-joblib.dump(model, "Dataset12_BestModel.pkl")
+joblib.dump(model, "istStock_Model.pkl")
 
 # Eğitim verisi violin plotları
 plt.figure(figsize=(12, 6))

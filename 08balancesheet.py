@@ -1,83 +1,82 @@
 import pandas as pd
-import seaborn as sns
+from sklearn.model_selection import train_test_split, cross_validate, KFold
+from sklearn.compose import make_column_selector as selector
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import r2_score
+from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
+import seaborn as sns
+import joblib
 
-# Load the dataset
-dataset = pd.read_csv('BalanceSheetDataSet.csv')
+# Veriyi yükle
+adult_census = pd.read_csv("BalanceSheetDataSet.csv")
 
-# Check for missing values
-print("Missing values before preprocessing:")
-print(dataset.isnull().sum())
+# Sadece istediğiniz sütunları seçin
+selected_columns = ["Nakit ve Nakit Benzerleri","Finansal Yatırımlar","Ticari Alacaklar","Finans Sektörü Faaliyetlerinden Alacaklar","Türkiye Cumhuriyet Merkez Bankası Hesabı","Diğer Alacaklar","Müşteri Sözleşmelerinden Doğan Varlıklar","İmtiyaz Sözleşmelerine İlişkin Finansal Varlıklar","Türev Araçlar","Stoklar","Peşin Ödenmiş Giderler"]
+data = adult_census[selected_columns]
 
-# Drop rows with missing values
-dataset.dropna(inplace=True)
 
-# Check for duplicate rows
-print("Duplicate rows before preprocessing:", dataset.duplicated().sum())
+# Hedef değişken
+target_name = "Dönem Net Kar/Zararı"
+target = adult_census[target_name]
 
-# Remove duplicate rows
-dataset.drop_duplicates(inplace=True)
+# Önişleme
+categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
+numerical_preprocessor = StandardScaler()
 
-# Separate inputs and outputs
-X = dataset.drop(columns=['Dönem Net Kar/Zararı'])
-y = dataset['Dönem Net Kar/Zararı']
+preprocessor = ColumnTransformer([
+    ('one-hot-encoder', categorical_preprocessor, selector(dtype_include="object")),
+    ('standard-scaler', numerical_preprocessor, selector(dtype_exclude="object"))
+])
 
-# Standardize inputs
-scaler_X = StandardScaler()
-X_scaled = scaler_X.fit_transform(X)
+# Modeli oluştur
+model = make_pipeline(preprocessor, LinearRegression())
 
-# Standardize outputs
-scaler_y = StandardScaler()
-y_scaled = scaler_y.fit_transform(y.values.reshape(-1, 1))
+# Veriyi eğitim ve test setlerine ayır
+data_train, data_test, target_train, target_test = train_test_split(data, target, test_size=0.2, random_state=47)
 
-# Convert scaled arrays back to DataFrame
-X_scaled_df = pd.DataFrame(X_scaled, columns=X.columns)
-y_scaled_df = pd.DataFrame(y_scaled, columns=['Dönem Net Kar/Zararı'])
+# Modeli eğit
+_ = model.fit(data_train, target_train)
 
-# Feature engineering: Create a new feature by multiplying 'Nakit ve Nakit Benzerleri' with 'Finansal Yatırımlar'
-X_scaled_df['New_Feature'] = X_scaled_df['Nakit ve Nakit Benzerleri'] * X_scaled_df['Finansal Yatırımlar']
+# Eğitim seti üzerinde tahminler yap
+train_predictions = model.predict(data_train)
 
-# Visualization
-for column in X_scaled_df.columns:
-    sns.histplot(X_scaled_df[column], kde=True)
-    plt.title(f'Histogram of {column}')
-    plt.show()
+# Eğitim seti performansını ölç
+train_r2 = r2_score(target_train, train_predictions)
 
-for column in X_scaled_df.columns:
-    sns.barplot(x=X_scaled_df[column], y=y_scaled_df['Dönem Net Kar/Zararı'])
-    plt.title(f'Bar chart of {column} vs Dönem Net Kar/Zararı')
-    plt.show()
+# Test seti üzerinde tahminler yap
+test_predictions = model.predict(data_test)
 
-for column in X_scaled_df.columns:
-    sns.scatterplot(x=X_scaled_df[column], y=y_scaled_df['Dönem Net Kar/Zararı'])
-    plt.title(f'Scatter plot of {column} vs Dönem Net Kar/Zararı')
-    plt.show()
+# Test seti performansını ölç
+test_r2 = r2_score(target_test, test_predictions)
 
-for column in X_scaled_df.columns:
-    sns.violinplot(x=X_scaled_df[column])
-    plt.title(f'Violin plot of {column}')
-    plt.show()
+print("Eğitim R^2 skoru:", train_r2)
+print("Test R^2 skoru:", test_r2)
 
-print("Summary statistics of inputs:")
-print(X_scaled_df.describe())
-print("Summary statistics of output:")
-print(y_scaled_df.describe())
+# Modeli kaydet
+joblib.dump(model, "BalanceSheet_Model.pkl")
 
-# Calculate correlation matrix
-correlation_matrix = X_scaled_df.corr().abs()
-
-# Plot normalized absolute cross-correlation map using seaborn
-plt.figure(figsize=(12, 8))
-sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
-plt.title('Normalized Absolute Cross-Correlation Map of Inputs')
+# Eğitim verisi histogramları
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data_train.columns):
+    plt.subplot(4, 4, i + 1)
+    sns.histplot(data_train[column], kde=True)
+    plt.title(column)
+plt.tight_layout()
 plt.show()
 
-# Calculate correlation between inputs and output
-correlation_with_output = X_scaled_df.corrwith(y_scaled_df['Dönem Net Kar/Zararı'])
 
-# Plot normalized absolute cross-correlation map between inputs and output
-plt.figure(figsize=(8, 6))
-sns.heatmap(correlation_with_output.to_frame(), annot=True, cmap='coolwarm', fmt=".2f")
-plt.title('Normalized Absolute Cross-Correlation Map between Inputs and Output')
+
+# Eğitim verisi violin plotları
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data_train.columns):
+    plt.subplot(4, 4, i + 1)
+    sns.violinplot(x=target_train, y=data_train[column])
+    plt.title(column)
+plt.tight_layout()
 plt.show()
+
+

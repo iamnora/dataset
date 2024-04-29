@@ -1,103 +1,82 @@
-import numpy as np
 import pandas as pd
-import seaborn as sns
+from sklearn.model_selection import train_test_split, cross_validate, KFold
+from sklearn.compose import make_column_selector as selector
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.linear_model import LinearRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import r2_score
+from sklearn.impute import SimpleImputer
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import StandardScaler
+import seaborn as sns
+import joblib
 
-# Veri setini yükle
-df = pd.read_csv('moviedata.csv')
+# Veriyi yükle
+adult_census = pd.read_csv("moviadata.csv")
 
-# Sıfır boyutlu dizileri atlayarak sadece 1 boyutlu veya daha büyük dizileri alın
-filtered_red_hist = [x for x in df['red_hist'].values if len(x) > 0]
+# Sadece istediğiniz sütunları seçin
+selected_columns = ["band10","band20","band30","band40","band50","band60","band70","band80","band90","band100"]
+data = adult_census[selected_columns]
 
-# Her bir NumPy dizisini düzleştirin ve listeye ekleyin
-flat_red_hist = np.hstack(filtered_red_hist)
 
-# Dizeyi uygun şekilde işleyerek float'a dönüştürme işlemi
-cleaned_red_hist = filtered_red_hist[0].replace("[", "").replace("]", "")
-flat_red_hist = np.array([float(val) for val in cleaned_red_hist.split()])
+# Hedef değişken
+target_name = "rate"
+target = adult_census[target_name]
 
-# Sıfır boyutlu dizileri atlayarak sadece 1 boyutlu veya daha büyük dizileri alın
-filtered_band_last = [x for x in df['band_last'].values if pd.notnull(x) and isinstance(x, str)]
+# Önişleme
+categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
+numerical_preprocessor = StandardScaler()
 
-if filtered_band_last:
-    flat_band_last = np.hstack(filtered_band_last)
-else:
-    # Burada hata mesajını ayarlayabilir veya gerekirse başka bir işlem yapabilirsiniz
-    print("filtered_band_last listesi boş!")
+preprocessor = ColumnTransformer([
+    ('one-hot-encoder', categorical_preprocessor, selector(dtype_include="object")),
+    ('standard-scaler', numerical_preprocessor, selector(dtype_exclude="object"))
+])
 
-# Dizeyi uygun şekilde işleyerek float'a dönüştürme işlemi
-cleaned_band_last = filtered_band_last[0].replace("[", "").replace("]", "") if filtered_band_last else ''
-flat_band_last = np.array([float(val) for val in cleaned_band_last.split()]) if cleaned_band_last else np.array([])
+# Modeli oluştur
+model = make_pipeline(preprocessor, LinearRegression())
 
-# Veri setinin ilk birkaç satırını görüntüle
-print(df.head())
+# Veriyi eğitim ve test setlerine ayır
+data_train, data_test, target_train, target_test = train_test_split(data, target, test_size=0.2, random_state=47)
 
-# Veri setinin betimsel istatistiklerini görüntüle
-print(df.describe())
+# Modeli eğit
+_ = model.fit(data_train, target_train)
 
-# Veri setindeki eksik değerleri kontrol et
-print(df.isnull().sum())
+# Eğitim seti üzerinde tahminler yap
+train_predictions = model.predict(data_train)
 
-# Standardize the input features
-scaler_rgb = StandardScaler()
-scaler_sound = StandardScaler()
+# Eğitim seti performansını ölç
+train_r2 = r2_score(target_train, train_predictions)
 
-rgb_histograms_scaled = scaler_rgb.fit_transform(flat_red_hist.reshape(-1, 1))
+# Test seti üzerinde tahminler yap
+test_predictions = model.predict(data_test)
 
-# Eğer işlem tamamsa, düzleştirilmiş diziyi orijinal şekline dönüştürün
-if rgb_histograms_scaled is not None:
-    rgb_histograms_scaled = rgb_histograms_scaled.reshape(-1, 1)
+# Test seti performansını ölç
+test_r2 = r2_score(target_test, test_predictions)
 
-sound_features_scaled = scaler_sound.fit_transform(flat_band_last.reshape(-1,1))
+print("Eğitim R^2 skoru:", train_r2)
+print("Test R^2 skoru:", test_r2)
 
-# Extract new features if possible
+# Modeli kaydet
+joblib.dump(model, "movieTrailer_Model.pkl")
 
-# Create a tabular dataset
-data = np.concatenate((rgb_histograms_scaled, sound_features_scaled), axis=1)
-columns = ['rate', 'red_hist', 'green_hist', 'blue_hist', 'std_pow', 'max_pow', 'min_pow', 'mean_pow', 'max_pow_freq', 'max_pow_time', 'band5', 'band10', 'band15', 'band20', 'band25', 'band30', 'band35', 'band40', 'band45', 'band50', 'band55', 'band60', 'band65', 'band70', 'band75', 'band80', 'band85', 'band90', 'band95', 'band100', 'band105', 'band110', 'band115', 'band120', 'band_last']
-df = pd.DataFrame(data, columns=columns)
-
-# Statistical information
-stats_info = df.describe()
-
-# Plot histograms, box plots, and violin plots
-plt.figure(figsize=(15, 10))
-for i, column in enumerate(df.columns):
-    plt.subplot(3, 4, i+1)
-    sns.histplot(df[column], kde=True)
+# Eğitim verisi histogramları
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data_train.columns):
+    plt.subplot(4, 4, i + 1)
+    sns.histplot(data_train[column], kde=True)
     plt.title(column)
 plt.tight_layout()
 plt.show()
 
-plt.figure(figsize=(15, 10))
-for i, column in enumerate(df.columns):
-    plt.subplot(3, 4, i+1)
-    sns.boxplot(y=df[column])
+
+
+# Eğitim verisi violin plotları
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data_train.columns):
+    plt.subplot(4, 4, i + 1)
+    sns.violinplot(x=target_train, y=data_train[column])
     plt.title(column)
 plt.tight_layout()
 plt.show()
 
-plt.figure(figsize=(15, 10))
-for i, column in enumerate(df.columns):
-    plt.subplot(3, 4, i+1)
-    sns.violinplot(y=df[column])
-    plt.title(column)
-plt.tight_layout()
-plt.show()
 
-# Scatter plot or bar plot for behavior of each input according to its output
-plt.figure(figsize=(15, 10))
-for i, column in enumerate(columns):
-    plt.subplot(3, 4, i+1)
-    sns.scatterplot(data=df, x=column, y='IMDB_score')  # 'IMDB_score' sütununu uygun bir şekilde değiştirin
-    plt.title(column)
-plt.tight_layout()
-plt.show()
-
-# Normalized absolute cross-correlation map
-corr_matrix = df.corr().abs()
-plt.figure(figsize=(10, 8))
-sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f")
-plt.title("Absolute Cross-correlation Map")
-plt.show()

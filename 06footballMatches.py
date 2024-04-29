@@ -77,7 +77,7 @@ test_accuracy = accuracy_score(target_test, test_predictions)
 print("Test Accuracy:", test_accuracy)
 
 # En iyi modeli kaydet
-joblib.dump(best_model, "best_model.pkl")
+joblib.dump(best_model, "football_Model.pkl")
 
 
 
