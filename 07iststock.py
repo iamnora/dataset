@@ -32,9 +32,12 @@ categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
 numerical_preprocessor = StandardScaler()
 
 preprocessor = ColumnTransformer([
-    ('one-hot-encoder', categorical_preprocessor, selector(dtype_include="object")),
-    ('standard-scaler', numerical_preprocessor, selector(dtype_exclude="object"))
+    ('one-hot-encoder', categorical_preprocessor, []),
+    ('standard-scaler', numerical_preprocessor, selected_columns)
 ])
+
+#KFOLD
+kf = KFold(n_splits=5, shuffle=True)
 
 # Modeli oluştur
 model = make_pipeline(preprocessor, LinearRegression())
@@ -63,25 +66,28 @@ print("Test R^2 skoru:", test_r2)
 # Modeli kaydet
 joblib.dump(model, "istStock_Model.pkl")
 
-# Eğitim verisi violin plotları
+
+# Eğitim verisi scatter plotları
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data_train.columns):
+    plt.subplot(2, 3, i + 1)
+    sns.scatterplot(x=target_train, y=data_train[column])
+    plt.title(column)
+plt.tight_layout()
+plt.show()
+
+ # Eğitim verisi violin plotları
 plt.figure(figsize=(12, 6))
 for i, column in enumerate(data_train.columns):
     plt.subplot(2, 3, i + 1)
     sns.violinplot(x=target_train, y=data_train[column])
     plt.title(column)
-    
-
 plt.tight_layout()
-plt.show()
+plt.show() 
 
 
-# Eğitim verisi box plotları
-plt.figure(figsize=(12, 6))
-for i, column in enumerate(data_train.columns):
-    plt.subplot(2, 3, i + 1)
-    sns.boxplot(x=target_train, y=data_train[column])
-    plt.title(column)
-plt.tight_layout()
-plt.show()
+
+
+
 
 

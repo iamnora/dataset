@@ -28,12 +28,15 @@ categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
 numerical_preprocessor = StandardScaler()
 
 preprocessor = ColumnTransformer([
-    ('one-hot-encoder', categorical_preprocessor, selector(dtype_include="object")),
-    ('standard-scaler', numerical_preprocessor, selector(dtype_exclude="object"))
+    ('one-hot-encoder', categorical_preprocessor, []),
+    ('standard-scaler', numerical_preprocessor, selected_columns)
 ])
 
 # Modeli oluştur
 model = make_pipeline(preprocessor, LinearRegression())
+
+#KFOLD
+kf = KFold(n_splits=5, shuffle=True)
 
 # Veriyi eğitim ve test setlerine ayır
 data_train, data_test, target_train, target_test = train_test_split(data, target, test_size=0.2, random_state=47)
@@ -69,6 +72,14 @@ plt.tight_layout()
 plt.show()
 
 
+# Eğitim verisi scatter plotları
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data_train.columns):
+    plt.subplot(4, 4, i + 1)
+    sns.scatterplot(x=target_train, y=data_train[column])
+    plt.title(column)
+plt.tight_layout()
+plt.show()
 
 # Eğitim verisi violin plotları
 plt.figure(figsize=(12, 6))

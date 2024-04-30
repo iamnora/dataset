@@ -40,6 +40,8 @@ preprocessor = ColumnTransformer([
 # Modeli oluştur
 model = make_pipeline(preprocessor, LinearRegression())
 
+
+
 # Veriyi eğitim ve test setlerine ayır
 data_train, data_test, target_train, target_test = train_test_split(data, target, test_size=0.2, random_state=47)
 
@@ -73,7 +75,14 @@ for i, column in enumerate(data_train.columns):
 plt.tight_layout()
 plt.show()
 
-
+# Eğitim verisi scatter plotları
+plt.figure(figsize=(12, 6))
+for i, column in enumerate(data_train.columns):
+    plt.subplot(4, 4, i + 1)
+    sns.scatterplot(x=target_train, y=data_train[column])
+    plt.title(column)
+plt.tight_layout()
+plt.show()
 
 # Eğitim verisi violin plotları
 plt.figure(figsize=(12, 6))
