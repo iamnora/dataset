@@ -33,6 +33,10 @@ models = {
     "Support Vector Machine": SVC()
 }
 
+
+#KFOLD
+kf = KFold(n_splits=5, shuffle=True)
+
 # Her hedef değişken için ayrı ayrı modelleme yap
 for target_col in target_columns:
     target = adult_census[target_col]
