@@ -1,117 +1,77 @@
 import pandas as pd
-from sklearn.model_selection import train_test_split, cross_validate, StratifiedKFold
+from sklearn.model_selection import train_test_split, cross_validate, KFold
 from sklearn.compose import make_column_selector as selector
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.compose import ColumnTransformer
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.svm import SVR
+from sklearn.metrics import mean_squared_error, r2_score
 import joblib
-from stringClassifier import classify_strings
 from sklearn.pipeline import make_pipeline
 import matplotlib.pyplot as plt
 import seaborn as sns
+from stringClassifier import classify_strings
 
-# Veriyi yükle
-adult_census = pd.read_csv("accident_news.csv")
+adult_census = pd.read_csv("accident_news.csv", encoding="latin-1", delimiter=",")
 
-# Sadece istediğiniz sütunları seçin
-selected_columns = ["Content", "Location", "Province_Code", "otomobil", "motosiklet", "kamyonet"]
+selected_columns = ["Content", "Province_Code", "otomobil", "motosiklet"]
+
 data = adult_census[selected_columns]
 
-# Sınıflandırma için metin sütunlarını işle
 data["Content"] = classify_strings(data["Content"])
-data["Location"] = classify_strings(data["Location"])
 data["Province_Code"] = classify_strings(data["Province_Code"])
 
+print(data.isnull().sum())
+data.dropna(inplace=True)
 
-# Hedef değişken
-target_name = "Death"
-target = adult_census[target_name]
+target_names = ["Date", "Location"]  # List of target column names
 
-# Önişleme
+adult_census["Date"] = pd.to_datetime(adult_census["Date"]).astype('int64') // 10**9  # Convert date to timestamp in seconds
+
 categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
 numerical_preprocessor = StandardScaler()
 
 preprocessor = ColumnTransformer([
-    ('one-hot-encoder', categorical_preprocessor, ["Content", "Location", "Province_Code"]),
-    ('standard-scaler', numerical_preprocessor, ["otomobil", "motosiklet", "kamyonet"])])
+    ('one-hot-encoder', categorical_preprocessor, ["Content", "Province_Code"]),
+    ('standard-scaler', numerical_preprocessor, ["otomobil", "motosiklet"])])
 
-# Modeller
 models = {
-    "Logistic Regression": LogisticRegression(max_iter=500),
-    "Random Forest": RandomForestClassifier(),
-    "Support Vector Machine": SVC()
+    "Linear Regression": LinearRegression(),
+    "Random Forest": RandomForestRegressor(),
+    "Support Vector Machine": SVR()
 }
 
-# Performans metrikleri
-metrics = {}
-
-# Model seçimi ve değerlendirme
-best_model = None
-best_score = 0
-
-for model_name, model in models.items():
-    pipeline = make_pipeline(preprocessor, model)
+for target_name in target_names:
+    target = adult_census[target_name]
+    data_train, data_test, target_train, target_test = train_test_split(data, target, test_size=0.2, random_state=47)
     
-    # Çapraz doğrulama
-    cv_results = cross_validate(pipeline, data, target, cv=StratifiedKFold(n_splits=10))
-    scores = cv_results["test_score"]
-    mean_accuracy = scores.mean()
-    std_accuracy = scores.std()
-    
-    print(f"{model_name} Cross Validation Accuracy: {mean_accuracy:.3f} +/- {std_accuracy:.3f}")
-    
-    # En iyi modeli seç
-    if mean_accuracy > best_score:
-        best_model = pipeline
-        best_score = mean_accuracy
+    best_model = None
+    best_score = float('-inf')  # Negative infinity
 
-# Train-test ayırma
-data_train, data_test, target_train, target_test = train_test_split(data, target, test_size=0.2, random_state=47, stratify=target)
+    for model_name, model in models.items():
+        pipeline = make_pipeline(preprocessor, model)
+        
+        cv_results = cross_validate(pipeline, data_train, target_train, cv=KFold(n_splits=10), scoring='r2')
+        scores = cv_results["test_score"]
+        mean_r2 = scores.mean()
+        std_r2 = scores.std()
+        
+        print(f"{target_name} - {model_name} Cross Validation R2 Score: {mean_r2:.3f} +/- {std_r2:.3f}")
+        
+        if mean_r2 > best_score:
+            best_model = pipeline
+            best_score = mean_r2
 
-# En iyi modelle eğitim
-best_model.fit(data_train, target_train)
+    if best_model:
+        best_model.fit(data_train, target_train)
 
-# Eğitim seti performans metrikleri
-train_predictions = best_model.predict(data_train)
-train_accuracy = accuracy_score(target_train, train_predictions)
-print("Train Accuracy:", train_accuracy)
+        train_predictions = best_model.predict(data_train)
+        train_r2 = r2_score(target_train, train_predictions)
+        print(f"{target_name} - Train R2 Score:", train_r2)
 
-# Test seti performans metrikleri
-test_predictions = best_model.predict(data_test)
-test_accuracy = accuracy_score(target_test, test_predictions)
-print("Test Accuracy:", test_accuracy)
+        test_predictions = best_model.predict(data_test)
+        test_r2 = r2_score(target_test, test_predictions)
+        print(f"{target_name} - Test R2 Score:", test_r2)
 
-# En iyi modeli kaydet
-joblib.dump(best_model, "Dataset11_BestModel")
-
-
-# Veri öncesi histogramlar
-plt.figure(figsize=(12, 6))
-for i, column in enumerate(data.columns):
-    plt.subplot(2, 3, i + 1)
-    sns.histplot(data[column], kde=True)
-    plt.title(column)
-plt.tight_layout()
-plt.show()
-
-# Veri öncesi violin plotlar
-plt.figure(figsize=(12, 6))
-for i, column in enumerate(data.columns):
-    plt.subplot(2, 3, i + 1)
-    sns.violinplot(y=data[column])
-    plt.title(column)
-plt.tight_layout()
-plt.show()
-
-# Veri öncesi box plotlar
-plt.figure(figsize=(12, 6))
-for i, column in enumerate(data.columns):
-    plt.subplot(2, 3, i + 1)
-    sns.boxplot(y=data[column])
-    plt.title(column)
-plt.tight_layout()
-plt.show()
-
+        joblib.dump(best_model, f"Dataset11_BestModel_{target_name}.joblib")
